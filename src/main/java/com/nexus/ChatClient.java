@@ -33,7 +33,13 @@ public class ChatClient {
             Scanner scanner = new Scanner(System.in);
             String text;
 
-            System.out.println("Type your messages (type 'exit' to quit):");
+
+            System.out.print("Enter your username for Nexus Chat: ");
+            String username = scanner.nextLine();
+            writer.println(username); // Send the name as the very first message
+
+            System.out.println("Welcome, " + username + "! Type your messages (type 'exit' to quit):");
+
             do {
                 System.out.print("> ");
                 text = scanner.nextLine();

@@ -41,6 +41,7 @@ class ClientHandler implements Runnable {
     private Socket socket;
     private PrintWriter writer;
     private CopyOnWriteArrayList<ClientHandler> clients;
+    private String clientName; // New field
 
     public ClientHandler(Socket socket, CopyOnWriteArrayList<ClientHandler> clients) {
         this.socket = socket;
@@ -56,17 +57,21 @@ class ClientHandler implements Runnable {
             OutputStream output = socket.getOutputStream();
             writer = new PrintWriter(output, true);
 
+            // The first message received is the username
+            this.clientName = reader.readLine();
+            System.out.println("User " + clientName + " has joined the Nexus.");
+            ChatServer.broadcast("--- " + clientName + " joined the chat ---", this);
+
             String message;
             while ((message = reader.readLine()) != null) {
-                System.out.println("Relaying: " + message);
-                // Call the static broadcast method in the Server
-                ChatServer.broadcast(message, this);
-                
                 if (message.equalsIgnoreCase("exit")) break;
+                
+                // Now we broadcast with the name!
+                ChatServer.broadcast("[" + clientName + "]: " + message, this);
             }
 
         } catch (IOException e) {
-            System.out.println("Connection lost with a client.");
+            System.out.println(clientName + " disconnected.");
         } finally {
             cleanup();
         }

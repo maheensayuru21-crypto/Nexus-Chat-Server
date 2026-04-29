@@ -109,7 +109,15 @@ class ClientHandler implements Runnable {
 
     private void cleanup() {
         try {
+            // Remove the user from the active list
             clients.remove(this);
+            
+            // Broadcast their departure to everyone else
+            if (clientName != null) {
+                ChatServer.broadcast("--- " + clientName + " has left the Nexus ---", this);
+                System.out.println(clientName + " disconnected from the server.");
+            }
+            
             socket.close();
         } catch (IOException e) {
             e.printStackTrace();

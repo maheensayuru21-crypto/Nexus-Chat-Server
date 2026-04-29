@@ -21,8 +21,11 @@ public class ChatClient {
                     String serverMessage;
                     while ((serverMessage = reader.readLine()) != null) {
                         System.out.println("\n" + serverMessage);
-                        System.out.print("> "); // Keep the prompt visible
+                        System.out.print("> "); 
                     }
+                } catch (SocketException e) {
+                    // This catches the expected disconnection when we type 'exit'
+                    System.out.println("\nDisconnected from the Nexus.");
                 } catch (IOException e) {
                     System.out.println("Error reading from server: " + e.getMessage());
                 }

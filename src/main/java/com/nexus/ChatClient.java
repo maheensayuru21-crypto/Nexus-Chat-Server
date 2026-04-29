@@ -2,6 +2,7 @@ package com.nexus;
 
 import java.io.*;
 import java.net.*;
+import java.time.format.DateTimeFormatter;
 import java.util.Scanner;
 
 public class ChatClient {
@@ -40,9 +41,16 @@ public class ChatClient {
 
             System.out.println("Welcome, " + username + "! Type your messages (type 'exit' to quit):");
 
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("hh:mm a");
+
             do {
                 System.out.print("> ");
                 text = scanner.nextLine();
+                
+                // Print the timestamp on your own screen
+                String time = java.time.LocalTime.now().format(formatter);
+                System.out.println("[" + time + "] You: " + text);
+                
                 writer.println(text);
             } while (!text.equalsIgnoreCase("exit"));
 

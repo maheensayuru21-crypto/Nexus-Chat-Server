@@ -3,6 +3,8 @@ package com.nexus;
 import java.io.*;
 import java.net.*;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 
 public class ChatServer {
     private static final int PORT = 5000;
@@ -28,10 +30,16 @@ public class ChatServer {
 
     // This method sends a message to EVERYONE in the list
     public static void broadcast(String message, ClientHandler sender) {
+        // Create a format like 10:45 AM
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("hh:mm a");
+        String time = LocalTime.now().format(formatter);
+        
+        // Create the final stamped message
+        String stampedMessage = "[" + time + "] " + message;
+
         for (ClientHandler client : clients) {
-            // We don't want to send the message back to the person who sent it
             if (client != sender) {
-                client.sendMessage(message);
+                client.sendMessage(stampedMessage);
             }
         }
     }

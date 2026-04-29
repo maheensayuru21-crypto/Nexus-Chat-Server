@@ -74,8 +74,25 @@ class ClientHandler implements Runnable {
             while ((message = reader.readLine()) != null) {
                 if (message.equalsIgnoreCase("exit")) break;
                 
-                // Now we broadcast with the name!
-                ChatServer.broadcast("[" + clientName + "]: " + message, this);
+                // --- THE INTERCEPTOR ---
+                if (message.startsWith("/")) {
+                    if (message.equalsIgnoreCase("/users")) {
+                        // Build a list of all active users
+                        StringBuilder userList = new StringBuilder("--- Active Nexus Users ---\n");
+                        for (ClientHandler client : clients) {
+                            userList.append("- ").append(client.getClientName()).append("\n");
+                        }
+                        // Send this list ONLY to the person who asked
+                        this.sendMessage(userList.toString());
+                    } else {
+                        // Handle typos in commands
+                        this.sendMessage("System: Unknown command.");
+                    }
+                } 
+                // --- NORMAL MESSAGE ---
+                else {
+                    ChatServer.broadcast("[" + clientName + "]: " + message, this);
+                }
             }
 
         } catch (IOException e) {
@@ -97,5 +114,12 @@ class ClientHandler implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public String getClientName() {
+        return this.clientName;
+    
+    
+
     }
 }

@@ -15,6 +15,15 @@ public class ChatServer {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             System.out.println("Nexus Chat Server is live on port " + PORT);
 
+            // --- TEST DB CONNECTION ---
+            if (DatabaseManager.getConnection() != null) {
+                System.out.println("Successfully linked to Nexus Banking Database!");
+            } else {
+                System.out.println("Warning: Running without database access.");
+            }
+            // --------------------------
+
+
             while (true) {
                 Socket socket = serverSocket.accept();
                 System.out.println("New connection established!");
@@ -77,15 +86,19 @@ class ClientHandler implements Runnable {
                 // --- THE INTERCEPTOR ---
                 if (message.startsWith("/")) {
                     if (message.equalsIgnoreCase("/users")) {
-                        // Build a list of all active users
                         StringBuilder userList = new StringBuilder("--- Active Nexus Users ---\n");
                         for (ClientHandler client : clients) {
                             userList.append("- ").append(client.getClientName()).append("\n");
                         }
-                        // Send this list ONLY to the person who asked
                         this.sendMessage(userList.toString());
-                    } else {
-                        // Handle typos in commands
+                    } 
+                    // ---> NEW BANKING COMMAND <---
+                    else if (message.equalsIgnoreCase("/balance")) {
+                        this.sendMessage("[Nexus Bank]: Checking securely...");
+                        String balanceResponse = DatabaseManager.getBalance(this.clientName);
+                        this.sendMessage("[Nexus Bank]: " + balanceResponse);
+                    }
+                    else {
                         this.sendMessage("System: Unknown command.");
                     }
                 } 

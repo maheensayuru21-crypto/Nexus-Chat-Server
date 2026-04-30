@@ -74,8 +74,47 @@ class ClientHandler implements Runnable {
             OutputStream output = socket.getOutputStream();
             writer = new PrintWriter(output, true);
 
-            // The first message received is the username
-            this.clientName = reader.readLine();
+            // --- AUTHENTICATION GATE ---
+            this.sendMessage("System: Welcome to Nexus. Please authenticate.");
+            this.sendMessage("System: Use /register <username> <password> OR /login <username> <password>");
+
+            boolean isAuthenticated = false;
+            String authMessage;
+
+            while (!isAuthenticated && (authMessage = reader.readLine()) != null) {
+                if (authMessage.startsWith("/register ") || authMessage.startsWith("/login ")) {
+                    String[] parts = authMessage.split(" ");
+                    if (parts.length == 3) {
+                        String command = parts[0];
+                        String uName = parts[1];
+                        String pass = parts[2];
+
+                        if (command.equalsIgnoreCase("/register")) {
+                            if (DatabaseManager.registerUser(uName, pass)) {
+                                this.clientName = uName;
+                                isAuthenticated = true;
+                                this.sendMessage("[Nexus Security]: Registration successful. Identity verified.");
+                            } else {
+                                this.sendMessage("[Nexus Security]: Username taken. Try /login or a different name.");
+                            }
+                        } else if (command.equalsIgnoreCase("/login")) {
+                            if (DatabaseManager.authenticateUser(uName, pass)) {
+                                this.clientName = uName;
+                                isAuthenticated = true;
+                                this.sendMessage("[Nexus Security]: Login successful. Welcome back.");
+                            } else {
+                                this.sendMessage("[Nexus Security]: Access Denied. Invalid credentials.");
+                            }
+                        }
+                    } else {
+                        this.sendMessage("System: Invalid format. Use /login <user> <pass> or /register <user> <pass>");
+                    }
+                } else {
+                    this.sendMessage("System: You must authenticate first. Use /login or /register.");
+                }
+            }
+
+            // Authentication successful; proceed to standard routing
             System.out.println("User " + clientName + " has joined the Nexus.");
             ChatServer.broadcast("--- " + clientName + " joined the chat ---", this);
 

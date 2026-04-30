@@ -5,6 +5,8 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.security.MessageDigest;
+import java.util.Base64;
 
 public class DatabaseManager {
     // UPDATE THESE to match your Nexus Banking System database details
@@ -20,6 +22,7 @@ public class DatabaseManager {
             return null;
         }
     }
+
     // Method to query the database for a user's balance
     public static String getBalance(String username) {
         String query = "SELECT balance FROM accounts WHERE account_holder = ?";
@@ -107,68 +110,60 @@ public class DatabaseManager {
     }
 
     /**
-     * Executes an ACID-compliant fund transfer between two users.
-     * Uses manual commit control to ensure database integrity.
+     * Secures a plain text password using the SHA-256 cryptographic hash function.
      */
-    public static String transferFunds(String sender, String receiver, double amount) {
-        if (amount <= 0 || sender.equals(receiver)) {
-            return "Transfer failed. Invalid amount or recipient.";
-        }
-
-        // Adjust 'accounts' and 'username' to match the actual database table and column names
-        String withdrawSQL = "UPDATE accounts SET balance = balance - ? WHERE username = ? AND balance >= ?";
-        String depositSQL = "UPDATE accounts SET balance = balance + ? WHERE username = ?";
-
-        Connection conn = getConnection(); 
-        if (conn == null) {
-            return "Database connection error.";
-        }
-
+    public static String hashPassword(String password) {
         try {
-            // Disable auto-commit to begin the transaction
-            conn.setAutoCommit(false);
-
-            // Execute withdrawal
-            PreparedStatement withdrawStmt = conn.prepareStatement(withdrawSQL);
-            withdrawStmt.setDouble(1, amount);
-            withdrawStmt.setString(2, sender);
-            withdrawStmt.setDouble(3, amount);
-            int rowsAffected = withdrawStmt.executeUpdate();
-
-            // Rollback if withdrawal fails (e.g., insufficient funds)
-            if (rowsAffected == 0) {
-                conn.rollback();
-                conn.setAutoCommit(true);
-                return "Transfer failed. Insufficient funds.";
-            }
-
-            // Execute deposit
-            PreparedStatement depositStmt = conn.prepareStatement(depositSQL);
-            depositStmt.setDouble(1, amount);
-            depositStmt.setString(2, receiver);
-            int depositRows = depositStmt.executeUpdate();
-
-            // Rollback if receiver does not exist
-            if (depositRows == 0) {
-                conn.rollback();
-                conn.setAutoCommit(true);
-                return "Transfer failed. Recipient not found.";
-            }
-
-            // Commit transaction if both operations succeed
-            conn.commit();
-            conn.setAutoCommit(true);
-            return "Successfully transferred $" + String.format("%.2f", amount) + " to " + receiver + ".";
-
-        } catch (SQLException e) {
-            try {
-                // Failsafe rollback on SQL exception
-                conn.rollback();
-                conn.setAutoCommit(true);
-            } catch (SQLException ex) {
-                ex.printStackTrace();
-            }
-            return "Transfer failed due to a system error.";
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(password.getBytes("UTF-8"));
+            return Base64.getEncoder().encodeToString(hash);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
         }
+    }
+
+    /**
+     * Registers a new user with a generated account number, starting balance, and a hashed password.
+     */
+    public static boolean registerUser(String username, String password) {
+        // Generate a random 4-digit account number (e.g., 4012, 8921)
+        String generatedAccNumber = String.valueOf((int)(Math.random() * 9000) + 1000);
+        
+        // We added account_number to the INSERT statement!
+        String sql = "INSERT INTO accounts (account_number, account_holder, balance, password) VALUES (?, ?, 0.00, ?)";
+        try {
+            Connection conn = getConnection();
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, generatedAccNumber);
+            stmt.setString(2, username);
+            stmt.setString(3, hashPassword(password));
+            stmt.executeUpdate();
+            return true;
+        } catch (SQLException e) {
+            // We are also printing the real error to the server terminal so it never hides from us again!
+            System.out.println("Registration DB Error: " + e.getMessage()); 
+            return false; 
+        }
+    }
+
+    /**
+     * Authenticates a user by hashing the provided password and comparing it to the database.
+     */
+    public static boolean authenticateUser(String username, String password) {
+        String sql = "SELECT password FROM accounts WHERE account_holder = ?";
+        try {
+            Connection conn = getConnection();
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, username);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                String storedHash = rs.getString("password");
+                return storedHash.equals(hashPassword(password));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 }

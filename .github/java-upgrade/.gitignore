@@ -1,4 +1,2 @@
 target/
 .vscode/
-*.class
-.DS_Store

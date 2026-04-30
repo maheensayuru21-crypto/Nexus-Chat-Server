@@ -133,6 +133,9 @@ public class NexusDesktopClient extends Application {
     private void sendMessage() {
         String message = inputField.getText().trim();
         if (!message.isEmpty() && out != null) {
+            // Echo the message locally for the user interface
+            chatArea.appendText("You: " + message + "\n");
+            
             out.println(message);
             inputField.clear();
         }

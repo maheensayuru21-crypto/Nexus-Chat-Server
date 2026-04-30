@@ -105,4 +105,70 @@ public class DatabaseManager {
             return "Database connection error: " + e.getMessage();
         }
     }
+
+    /**
+     * Executes an ACID-compliant fund transfer between two users.
+     * Uses manual commit control to ensure database integrity.
+     */
+    public static String transferFunds(String sender, String receiver, double amount) {
+        if (amount <= 0 || sender.equals(receiver)) {
+            return "Transfer failed. Invalid amount or recipient.";
+        }
+
+        // Adjust 'accounts' and 'username' to match the actual database table and column names
+        String withdrawSQL = "UPDATE accounts SET balance = balance - ? WHERE username = ? AND balance >= ?";
+        String depositSQL = "UPDATE accounts SET balance = balance + ? WHERE username = ?";
+
+        Connection conn = getConnection(); 
+        if (conn == null) {
+            return "Database connection error.";
+        }
+
+        try {
+            // Disable auto-commit to begin the transaction
+            conn.setAutoCommit(false);
+
+            // Execute withdrawal
+            PreparedStatement withdrawStmt = conn.prepareStatement(withdrawSQL);
+            withdrawStmt.setDouble(1, amount);
+            withdrawStmt.setString(2, sender);
+            withdrawStmt.setDouble(3, amount);
+            int rowsAffected = withdrawStmt.executeUpdate();
+
+            // Rollback if withdrawal fails (e.g., insufficient funds)
+            if (rowsAffected == 0) {
+                conn.rollback();
+                conn.setAutoCommit(true);
+                return "Transfer failed. Insufficient funds.";
+            }
+
+            // Execute deposit
+            PreparedStatement depositStmt = conn.prepareStatement(depositSQL);
+            depositStmt.setDouble(1, amount);
+            depositStmt.setString(2, receiver);
+            int depositRows = depositStmt.executeUpdate();
+
+            // Rollback if receiver does not exist
+            if (depositRows == 0) {
+                conn.rollback();
+                conn.setAutoCommit(true);
+                return "Transfer failed. Recipient not found.";
+            }
+
+            // Commit transaction if both operations succeed
+            conn.commit();
+            conn.setAutoCommit(true);
+            return "Successfully transferred $" + String.format("%.2f", amount) + " to " + receiver + ".";
+
+        } catch (SQLException e) {
+            try {
+                // Failsafe rollback on SQL exception
+                conn.rollback();
+                conn.setAutoCommit(true);
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
+            return "Transfer failed due to a system error.";
+        }
+    }
 }

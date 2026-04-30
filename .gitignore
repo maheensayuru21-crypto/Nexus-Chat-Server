@@ -1,0 +1,12 @@
+# Maven build directory
+target/
+
+# IDE Settings
+.vscode/
+
+# Compiled class files
+*.class
+
+# OS generated files
+.DS_Store
+Thumbs.db

@@ -98,6 +98,38 @@ class ClientHandler implements Runnable {
                         String balanceResponse = DatabaseManager.getBalance(this.clientName);
                         this.sendMessage("[Nexus Bank]: " + balanceResponse);
                     }
+
+                    // ---> NEW TRANSFER COMMAND <---
+                    else if (message.startsWith("/transfer ")) {
+                        // Split into exactly 3 parts so the name can have spaces
+                        String[] parts = message.split(" ", 3);
+                        
+                        if (parts.length < 3) {
+                            this.sendMessage("System: Invalid format. Use /transfer [amount] [recipient]");
+                        } else {
+                            try {
+                                double amount = Double.parseDouble(parts[1]);
+                                String recipient = parts[2];
+                                
+                                this.sendMessage("[Nexus Bank]: Processing transfer...");
+                                String result = DatabaseManager.transferFunds(this.clientName, recipient, amount);
+                                this.sendMessage("[Nexus Bank]: " + result);
+
+                                // BONUS: If the transfer works AND the recipient is online, notify them!
+                                if (result.startsWith("Successfully")) {
+                                    for (ClientHandler client : clients) {
+                                        if (client.getClientName().equalsIgnoreCase(recipient)) {
+                                            client.sendMessage("[Nexus Bank ALERTS]: You just received $" + String.format("%.2f", amount) + " from " + this.clientName + "!");
+                                        }
+                                    }
+                                }
+
+                            } catch (NumberFormatException e) {
+                                this.sendMessage("System: Invalid amount. Please enter a valid number.");
+                            }
+                        }
+                    }
+                    
                     else {
                         this.sendMessage("System: Unknown command.");
                     }

@@ -20,6 +20,34 @@
       <artifactId>mysql-connector-j</artifactId>
       <version>8.3.0</version>
     </dependency>
+
+    <!-- JavaFX Controls for UI Elements -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>21.0.1</version> <!-- Matches your Java 21 LTS -->
+        </dependency>
+        <!-- JavaFX Graphics -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>21.0.1</version>
+        </dependency>
     </dependencies>
+
+<build>
+        <plugins>
+            <!-- JavaFX Maven Plugin -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <!-- This tells Maven exactly which file to launch -->
+                    <mainClass>com.nexus.NexusDesktopClient</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>    
 
 </project>

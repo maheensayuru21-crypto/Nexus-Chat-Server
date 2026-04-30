@@ -1,0 +1,5 @@
+com\nexus\ChatServer.class
+com\nexus\ClientHandler.class
+com\nexus\NexusDesktopClient.class
+com\nexus\DatabaseManager.class
+com\nexus\ChatClient.class

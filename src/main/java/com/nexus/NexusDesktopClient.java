@@ -17,6 +17,13 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 
+import javafx.geometry.Pos; // for centering the watermark
+import javafx.scene.layout.StackPane; // for layering
+import javafx.scene.text.Font; // for styling the text
+import javafx.scene.text.FontWeight; // for making it bold
+import javafx.scene.control.Label; // for the text object itself
+import javafx.scene.paint.Color; // for controlling transparency
+
 public class NexusDesktopClient extends Application {
 
     private PrintWriter out;
@@ -29,11 +36,22 @@ public class NexusDesktopClient extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-        // 1. Setup the UI Components
+        // --- Layer 1: The Watermark Background ---
+        Label watermark = new Label("CREATED BY\nMaheen"); 
+        
+        // Style the watermark: Large font, bold, semi-transparent
+        watermark.setFont(Font.font("Consolas", FontWeight.BOLD, 48));
+        watermark.setTextFill(Color.rgb(200, 200, 200, 0.20));
+        watermark.setStyle("-fx-text-alignment: center;");
+        
+        // Optional: Slightly rotate the watermark for a more stylistic look
+        watermark.setRotate(-30);
+        
+        // --- Layer 2: The Original Chat UI (Refactored) ---
+        // (This code remains largely the same, just organized differently)
         chatArea = new TextArea();
         chatArea.setEditable(false);
         chatArea.setWrapText(true);
-        chatArea.setStyle("-fx-font-family: 'Consolas'; -fx-font-size: 14px;");
 
         inputField = new TextField();
         inputField.setPromptText("Type your message or a command like /balance...");
@@ -41,36 +59,54 @@ public class NexusDesktopClient extends Application {
 
         Button sendButton = new Button("Send");
         sendButton.setOnAction(e -> sendMessage());
-
-        // Pressing Enter also sends the message
         inputField.setOnAction(e -> sendMessage());
 
         HBox bottomBar = new HBox(10, inputField, sendButton);
         bottomBar.setPadding(new Insets(10));
 
-        BorderPane root = new BorderPane();
-        root.setCenter(chatArea);
-        root.setBottom(bottomBar);
+        BorderPane mainUI = new BorderPane();
+        mainUI.setCenter(chatArea);
+        mainUI.setBottom(bottomBar);
+        
 
-        // 2. Configure the Window
+        chatArea.setOpacity(0.95); // Make chat text slightly see-through
+        // Make the background of the mainUI transparent
+        mainUI.setStyle("-fx-background-color: transparent;"); 
+
+        // --- Layer 3: Assemble the Stack ---
+        //create the new actual 'root' container
+        StackPane root = new StackPane();
+        
+        //add the layers: Bottom layer first (the watermark), then the UI on top.
+        root.getChildren().addAll(watermark, mainUI);
+        
+        // Ensure the watermark stays perfectly centered
+        StackPane.setAlignment(watermark, Pos.CENTER);
+
+        // --- Final Configuration ---
         Scene scene = new Scene(root, 600, 400);
+        
+        // Load the sleek dark theme CSS we already made
+        // JavaFX is smart enough to handle nested transparency
+        String cssPath = getClass().getResource("/nexus.css").toExternalForm();
+        scene.getStylesheets().add(cssPath);
+
         primaryStage.setTitle("Nexus Terminal GUI");
         primaryStage.setScene(scene);
-        primaryStage.setOnCloseRequest(e -> disconnect()); // Clean cleanup on exit
+        primaryStage.setOnCloseRequest(e -> disconnect()); 
         primaryStage.show();
 
-        // 3. Connect to the Server
         connectToServer();
     }
 
     private void connectToServer() {
         try {
-            // Connect to the exact same server your terminal client uses
-            socket = new Socket("localhost", 8080);
+            // Connect to the exact same server terminal client uses
+            socket = new Socket("localhost", 5000);
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            chatArea.appendText("System: Connected to Nexus Server on port 8080.\n");
+            chatArea.appendText("System: Connected to Nexus Server on port 5000.\n");
             chatArea.appendText("System: Please enter your username to log in.\n");
 
             // Start a background thread to listen for incoming messages

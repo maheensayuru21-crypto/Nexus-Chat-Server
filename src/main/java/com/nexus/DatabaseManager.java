@@ -45,7 +45,7 @@ public class DatabaseManager {
         }
     }
 
-    // Method to safely transfer funds using SQL Transactions
+    // Method to safely transfer funds using SQL Transactions AND log history
     public static String transferFunds(String sender, String recipient, double amount) {
         if (amount <= 0) return "Amount must be greater than zero.";
         if (sender.equalsIgnoreCase(recipient)) return "Cannot transfer to yourself.";
@@ -54,56 +54,53 @@ public class DatabaseManager {
         String checkRecipientQuery = "SELECT 1 FROM accounts WHERE account_holder = ?";
         String withdrawQuery = "UPDATE accounts SET balance = balance - ? WHERE account_holder = ?";
         String depositQuery = "UPDATE accounts SET balance = balance + ? WHERE account_holder = ?";
+        // NEW: The query to log the transaction
+        String logQuery = "INSERT INTO transactions (sender, recipient, amount) VALUES (?, ?, ?)";
 
-        // Get connection and start transaction
         try (Connection conn = getConnection()) {
-            // Turn off auto-commit to start a manual transaction
             conn.setAutoCommit(false); 
 
             try {
-                // 1. Check if recipient exists in the database
+                // 1. Check recipient
                 try (PreparedStatement checkRecStmt = conn.prepareStatement(checkRecipientQuery)) {
                     checkRecStmt.setString(1, recipient);
                     ResultSet rs = checkRecStmt.executeQuery();
-                    if (!rs.next()) {
-                        return "Transfer failed: Recipient '" + recipient + "' not found.";
-                    }
+                    if (!rs.next()) return "Transfer failed: Recipient '" + recipient + "' not found.";
                 }
 
-                // 2. Check if sender has enough money
+                // 2. Check sender funds
                 try (PreparedStatement checkSenderStmt = conn.prepareStatement(checkSenderQuery)) {
                     checkSenderStmt.setString(1, sender);
                     ResultSet rs = checkSenderStmt.executeQuery();
                     if (!rs.next()) return "Transfer failed: Your account was not found.";
-                    
-                    double currentBalance = rs.getDouble("balance");
-                    if (currentBalance < amount) return "Transfer failed: Insufficient funds.";
+                    if (rs.getDouble("balance") < amount) return "Transfer failed: Insufficient funds.";
                 }
 
                 // 3. Deduct from sender
                 try (PreparedStatement withdrawStmt = conn.prepareStatement(withdrawQuery)) {
-                    withdrawStmt.setDouble(1, amount);
-                    withdrawStmt.setString(2, sender);
-                    withdrawStmt.executeUpdate();
+                    withdrawStmt.setDouble(1, amount); withdrawStmt.setString(2, sender); withdrawStmt.executeUpdate();
                 }
 
                 // 4. Add to recipient
                 try (PreparedStatement depositStmt = conn.prepareStatement(depositQuery)) {
-                    depositStmt.setDouble(1, amount);
-                    depositStmt.setString(2, recipient);
-                    depositStmt.executeUpdate();
+                    depositStmt.setDouble(1, amount); depositStmt.setString(2, recipient); depositStmt.executeUpdate();
                 }
 
-                // If we reach here with no errors, save all changes!
+                // 5. NEW: Log the transaction into the ledger
+                try (PreparedStatement logStmt = conn.prepareStatement(logQuery)) {
+                    logStmt.setString(1, sender);
+                    logStmt.setString(2, recipient);
+                    logStmt.setDouble(3, amount);
+                    logStmt.executeUpdate();
+                }
+
                 conn.commit(); 
                 return "Successfully transferred $" + String.format("%.2f", amount) + " to " + recipient + ".";
 
             } catch (SQLException e) {
-                // If ANYTHING goes wrong, undo everything!
                 conn.rollback(); 
                 return "Transaction failed and rolled back: " + e.getMessage();
             }
-
         } catch (SQLException e) {
             return "Database connection error: " + e.getMessage();
         }
@@ -165,5 +162,43 @@ public class DatabaseManager {
             e.printStackTrace();
         }
         return false;
+    }
+
+    /**
+     * Retrieves the last 5 transactions for a specific user (both sent and received).
+     */
+    public static String getTransactionHistory(String username) {
+        String query = "SELECT sender, recipient, amount, transfer_date FROM transactions " +
+                       "WHERE sender = ? OR recipient = ? ORDER BY transfer_date DESC LIMIT 5";
+        StringBuilder history = new StringBuilder("--- Recent Transactions ---\n");
+        boolean hasHistory = false;
+
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setString(1, username);
+            stmt.setString(2, username);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                hasHistory = true;
+                String sender = rs.getString("sender");
+                String recipient = rs.getString("recipient");
+                double amount = rs.getDouble("amount");
+                String date = rs.getTimestamp("transfer_date").toString().substring(0, 16); // Clean up the timestamp
+
+                if (sender.equals(username)) {
+                    history.append("[").append(date).append("] SENT $").append(String.format("%.2f", amount)).append(" to ").append(recipient).append("\n");
+                } else {
+                    history.append("[").append(date).append("] RECEIVED $").append(String.format("%.2f", amount)).append(" from ").append(sender).append("\n");
+                }
+            }
+            
+            if (!hasHistory) return "No transaction history found.";
+            return history.toString();
+
+        } catch (SQLException e) {
+            return "Error retrieving history: " + e.getMessage();
+        }
     }
 }

@@ -137,6 +137,12 @@ class ClientHandler implements Runnable {
                         String balanceResponse = DatabaseManager.getBalance(this.clientName);
                         this.sendMessage("[Nexus Bank]: " + balanceResponse);
                     }
+                    // ---> NEW HISTORY COMMAND <---
+                    else if (message.equalsIgnoreCase("/history")) {
+                        this.sendMessage("[Nexus Bank]: Fetching transaction ledger...");
+                        String historyResponse = DatabaseManager.getTransactionHistory(this.clientName);
+                        this.sendMessage(historyResponse);
+                    }
 
                     // ---> NEW TRANSFER COMMAND <---
                     else if (message.startsWith("/transfer ")) {

@@ -126,6 +126,11 @@ public class NexusDesktopClient extends Application {
                 while ((response = in.readLine()) != null) {
                     String finalResponse = response;
                     Platform.runLater(() -> {
+                        // Intercept and discard the initial terminal instruction payload
+                        if (finalResponse.contains("System: Use /register") || finalResponse.contains("OR /login")) {
+                            return; 
+                        }
+
                         // Message routing based on active screen visibility
                         if (finalResponse.contains("Registration successful") || finalResponse.contains("Login successful")) {
                             errorLabel.setText(""); 

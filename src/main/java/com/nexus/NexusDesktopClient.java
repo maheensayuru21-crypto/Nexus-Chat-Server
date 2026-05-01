@@ -18,11 +18,12 @@ public class NexusDesktopClient extends Application {
     private TextArea chatArea;
     private TextField inputField;
 
-    // New Authentication UI Components
+    // Authentication UI Components
     private VBox loginScreen;
     private VBox chatScreen;
     private TextField userField;
     private PasswordField passField;
+    private Label errorLabel; // NEW: Dedicated label for login errors
 
     @Override
     public void start(Stage primaryStage) {
@@ -44,9 +45,16 @@ public class NexusDesktopClient extends Application {
         HBox btnBox = new HBox(10, loginBtn, registerBtn);
         btnBox.setAlignment(Pos.CENTER);
 
-        loginScreen = new VBox(15, titleLabel, userField, passField, btnBox);
+        // NEW: Setup the error label to be red and wrap text
+        errorLabel = new Label();
+        errorLabel.setStyle("-fx-text-fill: #ff4c4c; -fx-font-weight: bold;");
+        errorLabel.setWrapText(true);
+        errorLabel.setMaxWidth(250);
+        errorLabel.setAlignment(Pos.CENTER);
+
+        // Added errorLabel to the VBox
+        loginScreen = new VBox(15, titleLabel, userField, passField, btnBox, errorLabel);
         loginScreen.setAlignment(Pos.CENTER);
-        // Fallback dark background in case CSS isn't loaded
         loginScreen.setStyle("-fx-background-color: #1e1e2e;"); 
 
         // -- 2. BUILD THE CHAT/BANKING SCREEN --
@@ -64,14 +72,12 @@ public class NexusDesktopClient extends Application {
 
         chatScreen = new VBox(10, chatArea, inputBox);
         chatScreen.setPadding(new Insets(10));
-        chatScreen.setVisible(false); // Hidden until authenticated
+        chatScreen.setVisible(false);
 
         // -- 3. ASSEMBLE THE MAIN LAYOUT --
-        // StackPane allows us to put the chat screen behind the login screen
         StackPane root = new StackPane(chatScreen, loginScreen);
         Scene scene = new Scene(root, 650, 450);
         
-        // Attach your dark theme CSS
         try {
             scene.getStylesheets().add(getClass().getResource("/nexus.css").toExternalForm());
         } catch (Exception e) {
@@ -102,18 +108,30 @@ public class NexusDesktopClient extends Application {
                 while ((response = in.readLine()) != null) {
                     String finalResponse = response;
                     Platform.runLater(() -> {
-                        chatArea.appendText(finalResponse + "\n");
-                        
-                        // THE MAGIC: Switch screens if the server says we are authenticated
+                        // NEW LOGIC: Route messages based on which screen is visible
                         if (finalResponse.contains("Registration successful") || finalResponse.contains("Login successful")) {
+                            errorLabel.setText(""); // Clear any old errors
                             loginScreen.setVisible(false);
                             chatScreen.setVisible(true);
                             inputField.requestFocus();
+                            chatArea.appendText(finalResponse + "\n");
+                        } else if (!chatScreen.isVisible()) {
+                            // If the chat screen is hidden, we are on the login screen. Route messages to the red text!
+                            errorLabel.setText(finalResponse);
+                        } else {
+                            // Normal behavior: we are logged in, append to the main chat
+                            chatArea.appendText(finalResponse + "\n");
                         }
                     });
                 }
             } catch (IOException e) {
-                Platform.runLater(() -> chatArea.appendText("Connection error: " + e.getMessage() + "\n"));
+                Platform.runLater(() -> {
+                    if (!chatScreen.isVisible()) {
+                        errorLabel.setText("Server offline: " + e.getMessage());
+                    } else {
+                        chatArea.appendText("Connection error: " + e.getMessage() + "\n");
+                    }
+                });
             }
         }).start();
     }
@@ -122,12 +140,10 @@ public class NexusDesktopClient extends Application {
         String u = userField.getText().trim();
         String p = passField.getText().trim();
         if (!u.isEmpty() && !p.isEmpty() && out != null) {
-            // Secretly format the command just like the terminal version expects
             out.println(command + " " + u + " " + p);
+            errorLabel.setText(""); // Clear previous errors when they try again
         } else {
-            // Simple validation alert if they leave fields blank
-            Alert alert = new Alert(Alert.AlertType.WARNING, "Please enter both Username and Password.");
-            alert.show();
+            errorLabel.setText("Please enter both Username and Password.");
         }
     }
 
@@ -143,5 +159,4 @@ public class NexusDesktopClient extends Application {
     public static void main(String[] args) {
         launch(args);
     }
-
 }

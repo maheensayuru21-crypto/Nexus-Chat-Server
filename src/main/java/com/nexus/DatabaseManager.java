@@ -252,4 +252,80 @@ public class DatabaseManager {
             return "Database error: " + e.getMessage();
         }
     }
+
+    /**
+     * Verifies if a specific username exists within the accounts table.
+     */
+    public static boolean userExists(String username) {
+        String query = "SELECT 1 FROM accounts WHERE account_holder = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, username);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();
+        } catch (SQLException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Inserts a direct message into the offline queue for pending delivery.
+     */
+    public static void saveOfflineMessage(String sender, String recipient, String message) {
+        String query = "INSERT INTO offline_messages (sender, recipient, message) VALUES (?, ?, ?)";
+        try (Connection conn = getConnection(); 
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, sender);
+            stmt.setString(2, recipient);
+            stmt.setString(3, message);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Retrieves all pending messages for a user and clears them from the queue via SQL transaction.
+     */
+    public static String getAndClearOfflineMessages(String username) {
+        String selectQuery = "SELECT sender, message, timestamp FROM offline_messages WHERE recipient = ? ORDER BY timestamp ASC";
+        String deleteQuery = "DELETE FROM offline_messages WHERE recipient = ?";
+        StringBuilder messages = new StringBuilder();
+
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false);
+
+            try (PreparedStatement selectStmt = conn.prepareStatement(selectQuery)) {
+                selectStmt.setString(1, username);
+                ResultSet rs = selectStmt.executeQuery();
+                boolean hasMessages = false;
+                
+                while (rs.next()) {
+                    if (!hasMessages) {
+                        messages.append("\n--- Missed Messages ---\n");
+                        hasMessages = true;
+                    }
+                    String sender = rs.getString("sender");
+                    String text = rs.getString("message");
+                    String time = rs.getTimestamp("timestamp").toString().substring(0, 16);
+                    messages.append("[").append(time).append("] ").append(sender).append(" (offline): ").append(text).append("\n");
+                }
+                
+                if (hasMessages) {
+                    try (PreparedStatement deleteStmt = conn.prepareStatement(deleteQuery)) {
+                        deleteStmt.setString(1, username);
+                        deleteStmt.executeUpdate();
+                    }
+                }
+                
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                e.printStackTrace();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return messages.toString();
+    }
 }

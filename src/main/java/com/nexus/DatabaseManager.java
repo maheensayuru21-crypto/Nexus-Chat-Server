@@ -48,6 +48,8 @@ public class DatabaseManager {
     // Method to safely transfer funds using SQL Transactions AND log history
     public static String transferFunds(String sender, String recipient, double amount) {
         if (amount <= 0) return "Amount must be greater than zero.";
+        if (isFrozen(sender)) return "Transfer failed: Your account is FROZEN by an Admin.";
+        if (isFrozen(recipient)) return "Transfer failed: The recipient account is FROZEN.";
         if (sender.equalsIgnoreCase(recipient)) return "Cannot transfer to yourself.";
 
         String checkSenderQuery = "SELECT balance FROM accounts WHERE account_holder = ?";
@@ -199,6 +201,55 @@ public class DatabaseManager {
 
         } catch (SQLException e) {
             return "Error retrieving history: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Checks if a user's account is currently frozen.
+     */
+    public static boolean isFrozen(String username) {
+        String query = "SELECT is_frozen FROM accounts WHERE account_holder = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, username);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return rs.getBoolean("is_frozen");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    /**
+     * Admin command: Freezes or unfreezes an account.
+     */
+    public static String setFreezeStatus(String username, boolean freeze) {
+        String query = "UPDATE accounts SET is_frozen = ? WHERE account_holder = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setBoolean(1, freeze);
+            stmt.setString(2, username);
+            int rows = stmt.executeUpdate();
+            if (rows > 0) return freeze ? "Account '" + username + "' is now FROZEN." : "Account '" + username + "' is now UNFROZEN.";
+            return "Account '" + username + "' not found.";
+        } catch (SQLException e) {
+            return "Database error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Admin command: Wipes a user's balance to zero.
+     */
+    public static String resetBalance(String username) {
+        String query = "UPDATE accounts SET balance = 0.00 WHERE account_holder = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, username);
+            int rows = stmt.executeUpdate();
+            if (rows > 0) return "Account '" + username + "' balance has been RESET to $0.00.";
+            return "Account '" + username + "' not found.";
+        } catch (SQLException e) {
+            return "Database error: " + e.getMessage();
         }
     }
 }

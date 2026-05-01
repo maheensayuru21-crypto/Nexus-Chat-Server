@@ -94,6 +94,12 @@ class ClientHandler implements Runnable {
                                 this.clientName = uName;
                                 isAuthenticated = true;
                                 this.sendMessage("[Nexus Security]: Registration successful. Identity verified.");
+                                
+                                // Fetch and deliver offline messages upon successful authentication
+                                String missedMessages = DatabaseManager.getAndClearOfflineMessages(this.clientName);
+                                if (!missedMessages.isEmpty()) {
+                                    this.sendMessage(missedMessages);
+                                }
                             } else {
                                 this.sendMessage("[Nexus Security]: Username taken. Try /login or a different name.");
                             }
@@ -102,6 +108,12 @@ class ClientHandler implements Runnable {
                                 this.clientName = uName;
                                 isAuthenticated = true;
                                 this.sendMessage("[Nexus Security]: Login successful. Welcome back.");
+
+                                // Fetch and deliver offline messages upon successful authentication
+                                String missedMessages = DatabaseManager.getAndClearOfflineMessages(this.clientName);
+                                if (!missedMessages.isEmpty()) {
+                                    this.sendMessage(missedMessages);
+                                }
                             } else {
                                 this.sendMessage("[Nexus Security]: Access Denied. Invalid credentials.");
                             }
@@ -137,6 +149,39 @@ class ClientHandler implements Runnable {
                         String balanceResponse = DatabaseManager.getBalance(this.clientName);
                         this.sendMessage("[Nexus Bank]: " + balanceResponse);
                     }
+
+                    // Private messaging and offline routing logic
+                    else if (message.startsWith("/msg ")) {
+                        String[] parts = message.split(" ", 3);
+                        if (parts.length >= 3) {
+                            String targetUser = parts[1];
+                            String text = parts[2];
+                            boolean isOnline = false;
+
+                            // Scan active client threads for the recipient
+                            for (ClientHandler client : clients) { // Update 'clients' to your actual list name if different
+                                if (client.clientName != null && client.clientName.equalsIgnoreCase(targetUser)) {
+                                    client.sendMessage("[Private] " + this.clientName + ": " + text);
+                                    this.sendMessage("[Private to " + targetUser + "]: " + text);
+                                    isOnline = true;
+                                    break;
+                                }
+                            }
+
+                            // Route to database if recipient is not connected
+                            if (!isOnline) {
+                                if (DatabaseManager.userExists(targetUser)) {
+                                    DatabaseManager.saveOfflineMessage(this.clientName, targetUser, text);
+                                    this.sendMessage("[Server]: User '" + targetUser + "' is offline. Message queued for delivery.");
+                                } else {
+                                    this.sendMessage("[Server]: User '" + targetUser + "' does not exist.");
+                                }
+                            }
+                        } else {
+                            this.sendMessage("[Server]: Invalid syntax. Usage: /msg [username] [message]");
+                        }
+                    }
+
                     // ---> NEW HISTORY COMMAND <---
                     else if (message.equalsIgnoreCase("/history")) {
                         this.sendMessage("[Nexus Bank]: Fetching transaction ledger...");

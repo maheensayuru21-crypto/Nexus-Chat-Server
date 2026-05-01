@@ -3,155 +3,145 @@ package com.nexus;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HBox;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
 import javafx.stage.Stage;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
 
-import javafx.geometry.Pos; // for centering the watermark
-import javafx.scene.layout.StackPane; // for layering
-import javafx.scene.text.Font; // for styling the text
-import javafx.scene.text.FontWeight; // for making it bold
-import javafx.scene.control.Label; // for the text object itself
-import javafx.scene.paint.Color; // for controlling transparency
-
 public class NexusDesktopClient extends Application {
-
     private PrintWriter out;
     private BufferedReader in;
-    private Socket socket;
-    
-    // UI Elements
     private TextArea chatArea;
     private TextField inputField;
 
+    // New Authentication UI Components
+    private VBox loginScreen;
+    private VBox chatScreen;
+    private TextField userField;
+    private PasswordField passField;
+
     @Override
     public void start(Stage primaryStage) {
-        // --- Layer 1: The Watermark Background ---
-        Label watermark = new Label("CREATED BY\nMaheen"); 
+        // -- 1. BUILD THE LOGIN SCREEN --
+        Label titleLabel = new Label("Nexus Security Gateway");
+        titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #a0a0b5;");
         
-        // Style the watermark: Large font, bold, semi-transparent
-        watermark.setFont(Font.font("Consolas", FontWeight.BOLD, 48));
-        watermark.setTextFill(Color.rgb(200, 200, 200, 0.20));
-        watermark.setStyle("-fx-text-alignment: center;");
-        
-        // Optional: Slightly rotate the watermark for a more stylistic look
-        watermark.setRotate(-30);
-        
-        // --- Layer 2: The Original Chat UI (Refactored) ---
-        // (This code remains largely the same, just organized differently)
+        userField = new TextField();
+        userField.setPromptText("Username");
+        userField.setMaxWidth(250);
+
+        passField = new PasswordField();
+        passField.setPromptText("Password");
+        passField.setMaxWidth(250);
+
+        Button loginBtn = new Button("Secure Login");
+        Button registerBtn = new Button("Register New Account");
+
+        HBox btnBox = new HBox(10, loginBtn, registerBtn);
+        btnBox.setAlignment(Pos.CENTER);
+
+        loginScreen = new VBox(15, titleLabel, userField, passField, btnBox);
+        loginScreen.setAlignment(Pos.CENTER);
+        // Fallback dark background in case CSS isn't loaded
+        loginScreen.setStyle("-fx-background-color: #1e1e2e;"); 
+
+        // -- 2. BUILD THE CHAT/BANKING SCREEN --
         chatArea = new TextArea();
         chatArea.setEditable(false);
         chatArea.setWrapText(true);
+        VBox.setVgrow(chatArea, Priority.ALWAYS);
 
         inputField = new TextField();
-        inputField.setPromptText("Type your message or a command like /balance...");
-        inputField.setPrefWidth(400);
+        inputField.setPromptText("Type a command like /balance or /transfer...");
+        Button sendBtn = new Button("Send");
 
-        Button sendButton = new Button("Send");
-        sendButton.setOnAction(e -> sendMessage());
-        inputField.setOnAction(e -> sendMessage());
+        HBox inputBox = new HBox(10, inputField, sendBtn);
+        HBox.setHgrow(inputField, Priority.ALWAYS);
 
-        HBox bottomBar = new HBox(10, inputField, sendButton);
-        bottomBar.setPadding(new Insets(10));
+        chatScreen = new VBox(10, chatArea, inputBox);
+        chatScreen.setPadding(new Insets(10));
+        chatScreen.setVisible(false); // Hidden until authenticated
 
-        BorderPane mainUI = new BorderPane();
-        mainUI.setCenter(chatArea);
-        mainUI.setBottom(bottomBar);
+        // -- 3. ASSEMBLE THE MAIN LAYOUT --
+        // StackPane allows us to put the chat screen behind the login screen
+        StackPane root = new StackPane(chatScreen, loginScreen);
+        Scene scene = new Scene(root, 650, 450);
         
-
-        chatArea.setOpacity(0.95); // Make chat text slightly see-through
-        // Make the background of the mainUI transparent
-        mainUI.setStyle("-fx-background-color: transparent;"); 
-
-        // --- Layer 3: Assemble the Stack ---
-        //create the new actual 'root' container
-        StackPane root = new StackPane();
-        
-        //add the layers: Bottom layer first (the watermark), then the UI on top.
-        root.getChildren().addAll(watermark, mainUI);
-        
-        // Ensure the watermark stays perfectly centered
-        StackPane.setAlignment(watermark, Pos.CENTER);
-
-        // --- Final Configuration ---
-        Scene scene = new Scene(root, 600, 400);
-        
-        // Load the sleek dark theme CSS we already made
-        // JavaFX is smart enough to handle nested transparency
-        String cssPath = getClass().getResource("/nexus.css").toExternalForm();
-        scene.getStylesheets().add(cssPath);
+        // Attach your dark theme CSS
+        try {
+            scene.getStylesheets().add(getClass().getResource("/nexus.css").toExternalForm());
+        } catch (Exception e) {
+            System.out.println("Warning: nexus.css not found.");
+        }
 
         primaryStage.setTitle("Nexus Terminal GUI");
         primaryStage.setScene(scene);
-        primaryStage.setOnCloseRequest(e -> disconnect()); 
         primaryStage.show();
+
+        // -- 4. BUTTON BEHAVIORS --
+        loginBtn.setOnAction(e -> sendAuthCommand("/login"));
+        registerBtn.setOnAction(e -> sendAuthCommand("/register"));
+        sendBtn.setOnAction(e -> sendMessage());
+        inputField.setOnAction(e -> sendMessage());
 
         connectToServer();
     }
 
     private void connectToServer() {
-        try {
-            // Connect to the exact same server terminal client uses
-            socket = new Socket("localhost", 5000);
-            out = new PrintWriter(socket.getOutputStream(), true);
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        new Thread(() -> {
+            try {
+                Socket socket = new Socket("localhost", 5000);
+                out = new PrintWriter(socket.getOutputStream(), true);
+                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            chatArea.appendText("System: Connected to Nexus Server on port 5000.\n");
-            chatArea.appendText("System: Please enter your username to log in.\n");
-
-            // Start a background thread to listen for incoming messages
-            Thread listenerThread = new Thread(() -> {
-                try {
-                    String serverMessage;
-                    while ((serverMessage = in.readLine()) != null) {
-                        final String msg = serverMessage;
-                        // JavaFX rule: UI updates MUST happen on the application thread
-                        Platform.runLater(() -> chatArea.appendText(msg + "\n"));
-                    }
-                } catch (IOException e) {
-                    Platform.runLater(() -> chatArea.appendText("System: Connection to server lost.\n"));
+                String response;
+                while ((response = in.readLine()) != null) {
+                    String finalResponse = response;
+                    Platform.runLater(() -> {
+                        chatArea.appendText(finalResponse + "\n");
+                        
+                        // THE MAGIC: Switch screens if the server says we are authenticated
+                        if (finalResponse.contains("Registration successful") || finalResponse.contains("Login successful")) {
+                            loginScreen.setVisible(false);
+                            chatScreen.setVisible(true);
+                            inputField.requestFocus();
+                        }
+                    });
                 }
-            });
-            listenerThread.setDaemon(true); // Allows thread to die when app closes
-            listenerThread.start();
+            } catch (IOException e) {
+                Platform.runLater(() -> chatArea.appendText("Connection error: " + e.getMessage() + "\n"));
+            }
+        }).start();
+    }
 
-        } catch (IOException e) {
-            chatArea.appendText("Error: Could not connect to server. Is it running?\n");
+    private void sendAuthCommand(String command) {
+        String u = userField.getText().trim();
+        String p = passField.getText().trim();
+        if (!u.isEmpty() && !p.isEmpty() && out != null) {
+            // Secretly format the command just like the terminal version expects
+            out.println(command + " " + u + " " + p);
+        } else {
+            // Simple validation alert if they leave fields blank
+            Alert alert = new Alert(Alert.AlertType.WARNING, "Please enter both Username and Password.");
+            alert.show();
         }
     }
 
     private void sendMessage() {
         String message = inputField.getText().trim();
         if (!message.isEmpty() && out != null) {
-            // Echo the message locally for the user interface
             chatArea.appendText("You: " + message + "\n");
-            
             out.println(message);
             inputField.clear();
-        }
-    }
-
-    private void disconnect() {
-        try {
-            if (socket != null && !socket.isClosed()) {
-                socket.close();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
     public static void main(String[] args) {
         launch(args);
     }
+
 }

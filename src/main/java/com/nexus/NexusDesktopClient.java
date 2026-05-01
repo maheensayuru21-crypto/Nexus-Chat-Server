@@ -7,10 +7,13 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
 
 import java.io.*;
 import java.net.Socket;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 
 public class NexusDesktopClient extends Application {
     private PrintWriter out;
@@ -18,16 +21,17 @@ public class NexusDesktopClient extends Application {
     private TextArea chatArea;
     private TextField inputField;
 
-    // Authentication UI Components
     private VBox loginScreen;
     private VBox chatScreen;
     private TextField userField;
     private PasswordField passField;
-    private Label errorLabel; // NEW: Dedicated label for login errors
+    private Label errorLabel;
+
+    private final DateTimeFormatter timeFormat = DateTimeFormatter.ofPattern("HH:mm");
 
     @Override
     public void start(Stage primaryStage) {
-        // -- 1. BUILD THE LOGIN SCREEN --
+        // 1. Build Authentication Screen
         Label titleLabel = new Label("Nexus Security Gateway");
         titleLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #a0a0b5;");
         
@@ -45,23 +49,37 @@ public class NexusDesktopClient extends Application {
         HBox btnBox = new HBox(10, loginBtn, registerBtn);
         btnBox.setAlignment(Pos.CENTER);
 
-        // NEW: Setup the error label to be red and wrap text
         errorLabel = new Label();
         errorLabel.setStyle("-fx-text-fill: #ff4c4c; -fx-font-weight: bold;");
         errorLabel.setWrapText(true);
         errorLabel.setMaxWidth(250);
         errorLabel.setAlignment(Pos.CENTER);
 
-        // Added errorLabel to the VBox
         loginScreen = new VBox(15, titleLabel, userField, passField, btnBox, errorLabel);
         loginScreen.setAlignment(Pos.CENTER);
+        
+        // Fallback background color
         loginScreen.setStyle("-fx-background-color: #1e1e2e;"); 
 
-        // -- 2. BUILD THE CHAT/BANKING SCREEN --
+        // 2. Build Main Interface
         chatArea = new TextArea();
         chatArea.setEditable(false);
         chatArea.setWrapText(true);
-        VBox.setVgrow(chatArea, Priority.ALWAYS);
+        
+        // Ghost Watermark Configuration
+        Label watermark = new Label("NEXUS SECURE\nDeveloped by M4H33N");
+        watermark.setTextAlignment(TextAlignment.CENTER);
+        
+        // Apply styling, opacity, and rotation
+        watermark.setStyle("-fx-font-size: 50px; -fx-text-fill: rgba(160, 160, 181, 0.1); -fx-font-weight: bold;");
+        watermark.setRotate(-25);
+        
+        // Enable mouse transparency to allow text selection beneath the label
+        watermark.setMouseTransparent(true); 
+
+        // Wrap chat area and watermark in a StackPane
+        StackPane chatStack = new StackPane(chatArea, watermark);
+        VBox.setVgrow(chatStack, Priority.ALWAYS);
 
         inputField = new TextField();
         inputField.setPromptText("Type a command like /balance or /transfer...");
@@ -70,11 +88,11 @@ public class NexusDesktopClient extends Application {
         HBox inputBox = new HBox(10, inputField, sendBtn);
         HBox.setHgrow(inputField, Priority.ALWAYS);
 
-        chatScreen = new VBox(10, chatArea, inputBox);
+        chatScreen = new VBox(10, chatStack, inputBox);
         chatScreen.setPadding(new Insets(10));
         chatScreen.setVisible(false);
 
-        // -- 3. ASSEMBLE THE MAIN LAYOUT --
+        // 3. Assemble Main Layout
         StackPane root = new StackPane(chatScreen, loginScreen);
         Scene scene = new Scene(root, 650, 450);
         
@@ -88,7 +106,7 @@ public class NexusDesktopClient extends Application {
         primaryStage.setScene(scene);
         primaryStage.show();
 
-        // -- 4. BUTTON BEHAVIORS --
+        // 4. Input Actions
         loginBtn.setOnAction(e -> sendAuthCommand("/login"));
         registerBtn.setOnAction(e -> sendAuthCommand("/register"));
         sendBtn.setOnAction(e -> sendMessage());
@@ -108,19 +126,19 @@ public class NexusDesktopClient extends Application {
                 while ((response = in.readLine()) != null) {
                     String finalResponse = response;
                     Platform.runLater(() -> {
-                        // NEW LOGIC: Route messages based on which screen is visible
+                        // Message routing based on active screen visibility
                         if (finalResponse.contains("Registration successful") || finalResponse.contains("Login successful")) {
-                            errorLabel.setText(""); // Clear any old errors
+                            errorLabel.setText(""); 
                             loginScreen.setVisible(false);
                             chatScreen.setVisible(true);
                             inputField.requestFocus();
-                            chatArea.appendText(finalResponse + "\n");
+                            chatArea.appendText(getTimestamp() + finalResponse + "\n");
                         } else if (!chatScreen.isVisible()) {
-                            // If the chat screen is hidden, we are on the login screen. Route messages to the red text!
+                            // Route authentication errors to the error label
                             errorLabel.setText(finalResponse);
                         } else {
-                            // Normal behavior: we are logged in, append to the main chat
-                            chatArea.appendText(finalResponse + "\n");
+                            // Append standard messages to the main chat area
+                            chatArea.appendText(getTimestamp() + finalResponse + "\n");
                         }
                     });
                 }
@@ -129,7 +147,7 @@ public class NexusDesktopClient extends Application {
                     if (!chatScreen.isVisible()) {
                         errorLabel.setText("Server offline: " + e.getMessage());
                     } else {
-                        chatArea.appendText("Connection error: " + e.getMessage() + "\n");
+                        chatArea.appendText(getTimestamp() + "Connection error: " + e.getMessage() + "\n");
                     }
                 });
             }
@@ -141,7 +159,8 @@ public class NexusDesktopClient extends Application {
         String p = passField.getText().trim();
         if (!u.isEmpty() && !p.isEmpty() && out != null) {
             out.println(command + " " + u + " " + p);
-            errorLabel.setText(""); // Clear previous errors when they try again
+            // Reset error label state on new attempt
+            errorLabel.setText(""); 
         } else {
             errorLabel.setText("Please enter both Username and Password.");
         }
@@ -150,10 +169,15 @@ public class NexusDesktopClient extends Application {
     private void sendMessage() {
         String message = inputField.getText().trim();
         if (!message.isEmpty() && out != null) {
-            chatArea.appendText("You: " + message + "\n");
+            // Prepend timestamp to outgoing messages
+            chatArea.appendText(getTimestamp() + "You: " + message + "\n");
             out.println(message);
             inputField.clear();
         }
+    }
+
+    private String getTimestamp() {
+        return "[" + LocalTime.now().format(timeFormat) + "] ";
     }
 
     public static void main(String[] args) {

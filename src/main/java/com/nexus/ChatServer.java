@@ -143,6 +143,23 @@ class ClientHandler implements Runnable {
                         String historyResponse = DatabaseManager.getTransactionHistory(this.clientName);
                         this.sendMessage(historyResponse);
                     }
+                    // ---> ADMIN GOD MODE COMMANDS <---
+                    else if (message.startsWith("/freeze ") && this.clientName.equalsIgnoreCase("admin")) {
+                        String targetUser = message.split(" ")[1];
+                        this.sendMessage("[Nexus Admin]: " + DatabaseManager.setFreezeStatus(targetUser, true));
+                    }
+                    else if (message.startsWith("/unfreeze ") && this.clientName.equalsIgnoreCase("admin")) {
+                        String targetUser = message.split(" ")[1];
+                        this.sendMessage("[Nexus Admin]: " + DatabaseManager.setFreezeStatus(targetUser, false));
+                    }
+                    else if (message.startsWith("/reset ") && this.clientName.equalsIgnoreCase("admin")) {
+                        String targetUser = message.split(" ")[1];
+                        this.sendMessage("[Nexus Admin]: " + DatabaseManager.resetBalance(targetUser));
+                    }
+                    // Block normal users from trying to use admin commands
+                    else if ((message.startsWith("/freeze") || message.startsWith("/unfreeze") || message.startsWith("/reset")) && !this.clientName.equalsIgnoreCase("admin")) {
+                        this.sendMessage("[Nexus Security]: Access Denied. Administrator privileges required.");
+                    }
 
                     // ---> NEW TRANSFER COMMAND <---
                     else if (message.startsWith("/transfer ")) {

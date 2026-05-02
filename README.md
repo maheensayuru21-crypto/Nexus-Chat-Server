@@ -1,31 +1,66 @@
 # 🌐 Nexus Chat Server
 
-A high-performance, multi-threaded backend communication server built in Java. This project serves as the real-time networking node for the **Nexus Ecosystem**, allowing concurrent users to communicate and securely interact with the Nexus Banking database via TCP/IP sockets.
+A highly secure, high-performance client-server communication and banking platform featuring the **Nexus Security Gateway**. This project serves as the real-time networking node for the Nexus Ecosystem, allowing concurrent users to communicate and securely interact with the Nexus Banking database via encrypted TCP/IP sockets.
+
+## 📸 Interface Previews
+
+<p align="center">
+  <!-- GitHub will automatically generate the image links when you drag and drop your screenshots here! -->
+</p>
 
 ## 🚀 Key Features
+* **End-to-End Encryption:** All socket communication between the client and server is secured using SSL/TLS with custom keystore certificates.
+* **Cryptographic Identity Management:** User passwords are encrypted using the SHA-256 hash function before being stored in the database.
 * **Multi-threaded Client Handling:** Manages multiple concurrent user connections without blocking the main server thread.
-* **Stateful Identity Management:** Tracks active user sessions and dynamically routes broadcasts and private alerts.
-* **Microservice Database Integration:** Connects seamlessly to the independent Nexus Banking MySQL database via JDBC.
+* **Modern GUI:** A polished, responsive desktop client built with JavaFX, featuring dynamic text routing and a dark-theme aesthetic.
+* **Offline Message Queuing:** Direct messages sent to offline users are safely queued in the database and delivered immediately upon their next login.
 * **ACID-Compliant Transactions:** Executes secure, multi-step financial transfers between users directly through the chat interface, ensuring complete data integrity.
 
 ## 🛠️ Tech Stack
 * **Language:** Java (JDK 21)
+* **GUI Framework:** JavaFX
+* **Build Tool:** Maven (Configured for Fat JAR executables)
+* **Database:** MySQL 8.0+ & JDBC (`mysql-connector-j`)
+* **Security:** Java Secure Socket Extension (JSSE), `java.security.MessageDigest`
 * **Networking:** TCP/IP `java.net.Socket` and `ServerSocket`
-* **Concurrency:** `Runnable` interfaces, Thread manipulation, `CopyOnWriteArrayList`
-* **Database:** MySQL, JDBC (`mysql-connector-j`)
 
 ## 💻 Available Chat Commands
 The server features a built-in command router that intercepts and processes specific user requests:
 * `/users` - Retrieves a real-time list of all currently active clients in the chat.
-* `/balance` - Queries the Nexus Banking database to display the user's current secure account balance.
-* `/transfer [amount] [recipient]` - Initiates a secure SQL transaction to move funds between active accounts, instantly alerting the recipient upon success.
+* `/msg [username] [message]` - Send a direct message (safely queues if the recipient is offline).
+* `/balance` - Queries the Nexus Banking database to display your current secure account balance.
+* `/transfer [amount] [recipient]` - Initiates a secure SQL transaction to move funds, instantly alerting the recipient.
+* `/history` - View your recent transaction ledger.
+
+*Admin Commands:*
+* `/freeze [username]` - Lock a malicious account from making transactions.
+* `/reset [username]` - Wipe an account's balance to zero.
 
 ## ⚙️ Setup and Installation
-1. Clone the repository: `git clone https://github.com/maheensayuru21-crypto/Nexus-Chat-Server.git`
-2. Ensure your local MySQL server is running and the Nexus `bank_db` schema is initialized.
-3. Update the `DatabaseManager.java` file with your specific MySQL credentials.
-4. Compile and run `ChatServer.java` to start the listener on port `8080`.
-5. Run multiple instances of `ChatClient.java` to simulate the network!
+
+### Prerequisites
+1. Ensure you have **Java 21** or higher installed.
+2. Ensure you have **MySQL 8.0+** installed and running on `localhost:3306`.
+
+### Database Setup
+1. Open MySQL Workbench and create the database: `CREATE DATABASE bank_db;`
+2. Execute your SQL schema to generate the `accounts`, `transactions`, and `offline_messages` tables.
+
+### Running the Application (Executable JARs)
+The project is packaged into standalone executables via Maven. **Note:** Ensure the `nexus_keystore.p12` file is located in the exact same directory as your `.jar` files.
+
+**1. Start the Server**
+Open a terminal in the target directory and run:
+```bash
+java -jar NexusServer.jar
+```
+*The terminal will confirm when the SSL Server is active and listening on port 5000.*
+
+**2. Launch the Client**
+Open a separate terminal in the target directory and run:
+```bash
+java -jar NexusClient.jar
+```
 
 ---
-*Part of the Nexus Software Ecosystem.*
+*Developed by M4H33N. Part of the Nexus Software Ecosystem.*

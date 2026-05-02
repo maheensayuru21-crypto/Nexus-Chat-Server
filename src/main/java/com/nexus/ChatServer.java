@@ -5,6 +5,7 @@ import java.net.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import javax.net.ssl.SSLServerSocketFactory;
 
 public class ChatServer {
     private static final int PORT = 5000;
@@ -12,28 +13,30 @@ public class ChatServer {
     private static CopyOnWriteArrayList<ClientHandler> clients = new CopyOnWriteArrayList<>();
 
     public static void main(String[] args) {
-        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-            System.out.println("Nexus Chat Server is live on port " + PORT);
+        // Configure SSL System Properties
+        // Note: In a production environment, absolute paths or environment variables should be used.
+        System.setProperty("javax.net.ssl.keyStore", "nexus_keystore.p12");
+        System.setProperty("javax.net.ssl.keyStorePassword", "nexus123");
 
-            // --- TEST DB CONNECTION ---
-            if (DatabaseManager.getConnection() != null) {
-                System.out.println("Successfully linked to Nexus Banking Database!");
-            } else {
-                System.out.println("Warning: Running without database access.");
-            }
-            // --------------------------
+        System.out.println("[System]: Booting Nexus Secure Server on port " + PORT + "...");
 
+        // Initialize SSL Server Socket
+        SSLServerSocketFactory sslServerSocketFactory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
+
+        try (ServerSocket serverSocket = sslServerSocketFactory.createServerSocket(PORT)) {
+            System.out.println("[System]: SSL Server is active and listening for secure connections.");
 
             while (true) {
-                Socket socket = serverSocket.accept();
-                System.out.println("New connection established!");
-
-                ClientHandler handler = new ClientHandler(socket, clients);
-                clients.add(handler); // Add to the list
-                new Thread(handler).start();
+                Socket clientSocket = serverSocket.accept();
+                System.out.println("[System]: Secure connection established with client.");
+                
+                ClientHandler clientThread = new ClientHandler(clientSocket, clients);
+                clients.add(clientThread);
+                new Thread(clientThread).start();
             }
         } catch (IOException e) {
-            System.err.println("Server error: " + e.getMessage());
+            System.err.println("[Error]: Server exception: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -76,7 +79,6 @@ class ClientHandler implements Runnable {
 
             // --- AUTHENTICATION GATE ---
             this.sendMessage("System: Welcome to Nexus. Please authenticate.");
-            this.sendMessage("System: Use /register <username> <password> OR /login <username> <password>");
 
             boolean isAuthenticated = false;
             String authMessage;

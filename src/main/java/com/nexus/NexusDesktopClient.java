@@ -15,6 +15,8 @@ import java.net.Socket;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
+import javax.net.ssl.SSLSocketFactory;
+
 public class NexusDesktopClient extends Application {
     private PrintWriter out;
     private BufferedReader in;
@@ -50,6 +52,7 @@ public class NexusDesktopClient extends Application {
         btnBox.setAlignment(Pos.CENTER);
 
         errorLabel = new Label();
+        // Default error color is red
         errorLabel.setStyle("-fx-text-fill: #ff4c4c; -fx-font-weight: bold;");
         errorLabel.setWrapText(true);
         errorLabel.setMaxWidth(250);
@@ -118,7 +121,14 @@ public class NexusDesktopClient extends Application {
     private void connectToServer() {
         new Thread(() -> {
             try {
-                Socket socket = new Socket("localhost", 5000);
+                // Configure SSL System Properties to trust the self-signed certificate
+                System.setProperty("javax.net.ssl.trustStore", "nexus_keystore.p12");
+                System.setProperty("javax.net.ssl.trustStorePassword", "nexus123");
+
+                // Initialize SSL Socket
+                SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+                Socket socket = sslSocketFactory.createSocket("localhost", 5000);
+                
                 out = new PrintWriter(socket.getOutputStream(), true);
                 in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
@@ -126,23 +136,28 @@ public class NexusDesktopClient extends Application {
                 while ((response = in.readLine()) != null) {
                     String finalResponse = response;
                     Platform.runLater(() -> {
-                        // Intercept and discard the initial terminal instruction payload
-                        if (finalResponse.contains("System: Use /register") || finalResponse.contains("OR /login")) {
+                        // 1. Handle the Server Greeting (Paint it White)
+                        if (finalResponse.contains("System: Use /register") || finalResponse.contains("System: Welcome")) {
+                            errorLabel.setStyle("-fx-text-fill: white; -fx-font-weight: bold;");
+                            errorLabel.setText(finalResponse);
                             return; 
                         }
 
-                        // Message routing based on active screen visibility
+                        // 2. Handle Successful Login/Registration
                         if (finalResponse.contains("Registration successful") || finalResponse.contains("Login successful")) {
                             errorLabel.setText(""); 
                             loginScreen.setVisible(false);
                             chatScreen.setVisible(true);
                             inputField.requestFocus();
                             chatArea.appendText(getTimestamp() + finalResponse + "\n");
-                        } else if (!chatScreen.isVisible()) {
-                            // Route authentication errors to the error label
+                        } 
+                        // 3. Handle Authentication Errors (Paint them Red)
+                        else if (!chatScreen.isVisible()) {
+                            errorLabel.setStyle("-fx-text-fill: #ff4c4c; -fx-font-weight: bold;");
                             errorLabel.setText(finalResponse);
-                        } else {
-                            // Append standard messages to the main chat area
+                        } 
+                        // 4. Handle Standard Chat Messages
+                        else {
                             chatArea.appendText(getTimestamp() + finalResponse + "\n");
                         }
                     });
@@ -150,7 +165,8 @@ public class NexusDesktopClient extends Application {
             } catch (IOException e) {
                 Platform.runLater(() -> {
                     if (!chatScreen.isVisible()) {
-                        errorLabel.setText("Server offline: " + e.getMessage());
+                        errorLabel.setStyle("-fx-text-fill: #ff4c4c; -fx-font-weight: bold;");
+                        errorLabel.setText("Secure connection failed: " + e.getMessage());
                     } else {
                         chatArea.appendText(getTimestamp() + "Connection error: " + e.getMessage() + "\n");
                     }
@@ -162,11 +178,20 @@ public class NexusDesktopClient extends Application {
     private void sendAuthCommand(String command) {
         String u = userField.getText().trim();
         String p = passField.getText().trim();
-        if (!u.isEmpty() && !p.isEmpty() && out != null) {
+        
+        // Prevent silent failure if not connected
+        if (out == null) {
+            errorLabel.setStyle("-fx-text-fill: #ff4c4c; -fx-font-weight: bold;");
+            errorLabel.setText("Connection Error: Client is not connected to the server.");
+            return;
+        }
+
+        if (!u.isEmpty() && !p.isEmpty()) {
             out.println(command + " " + u + " " + p);
-            // Reset error label state on new attempt
             errorLabel.setText(""); 
         } else {
+            // Ensure local validation errors display in red
+            errorLabel.setStyle("-fx-text-fill: #ff4c4c; -fx-font-weight: bold;");
             errorLabel.setText("Please enter both Username and Password.");
         }
     }

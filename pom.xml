@@ -47,6 +47,16 @@
                     <mainClass>com.nexus.NexusDesktopClient</mainClass>
                 </configuration>
             </plugin>
+
+            <!-- JavaFX Runner Plugin -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>com.nexus.NexusDesktopClient</mainClass>
+                </configuration>
+            </plugin>
         </plugins>
     </build>    
 

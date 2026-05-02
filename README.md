@@ -5,7 +5,9 @@ A highly secure, high-performance client-server communication and banking platfo
 ## 📸 Interface Previews
 
 <p align="center">
-  <!-- GitHub will automatically generate the image links when you drag and drop your screenshots here! -->
+<img width="652" height="482" alt="Screenshot 2026-05-02 092341" src="https://github.com/user-attachments/assets/6af4e7a0-407e-4f7b-8a29-a396bc689360" />
+<img width="651" height="482" alt="Screenshot 2026-05-02 092502" src="https://github.com/user-attachments/assets/a5d577d5-2457-4fb8-81e9-68eace6d42c4" />
+
 </p>
 
 ## 🚀 Key Features
